@@ -1,0 +1,30 @@
+EDITING TASK:
+Use the user's uploaded motorcycle photo as the direct source image and primary visual truth.
+Preserve the exact motorcycle identity, body design, proportions, fairings, lights, wheels, suspension, windshield, mirrors, seat, and original product color unless explicitly requested otherwise.
+
+STYLE:
+Racing Performance
+Palette: black / graphite / white with red accents.
+Style strength: 2/4.
+Keep the design premium, mobile-readable, and low in advertising density.
+
+BACKGROUND:
+Preserve and enhance the original real factory/showroom/warehouse background. Do not replace it.
+Keep useful background motorcycles visible when present; they should communicate inventory/factory scale while remaining visually secondary.
+
+FORMAT:
+Aspect ratio: 9:16.
+Platform: Facebook.
+Language: English.
+
+ON-IMAGE TEXT:
+ELECTRIC MOTORCYCLE
+15000W Motor
+Top Speed 150 KM/H
+
+LAYOUT:
+Make the motorcycle the hero subject. Place text in negative space or in compact spec blocks without covering important product details.
+Use a strong but clean headline and restrained graphic accents. Avoid long copy, excessive badges, and invented claims.
+
+FINAL CHECK:
+Verify all numeric text exactly matches the supplied parameters. If any power, speed, or price text is wrong, regenerate rather than guessing.
