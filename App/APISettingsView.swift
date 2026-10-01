@@ -117,7 +117,7 @@ struct APISettingsView: View {
             Button(action: fetchModels) {
                 HStack { if loadingModels { ProgressView() }; Label(loadingModels ? "正在获取模型…" : "获取可用模型", systemImage: "arrow.clockwise") }
             }.buttonStyle(.borderedProminent).disabled(busy || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            if !modelFeedback.isEmpty { Text(modelFeedback).font(.caption).foregroundColor(models.isEmpty ? .orange : .secondary) }
+            if !modelFeedback.isEmpty { Text(modelFeedback).font(.caption).foregroundColor(models.isEmpty ? TranslatorDesign.warning : .secondary) }
         }.glassPanel()
     }
     private var modelsPanel: some View {
@@ -141,7 +141,7 @@ struct APISettingsView: View {
             TextField("例如 deepseek-flash", text: $configuration.model).textInputAutocapitalization(.never)
                 .disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(busy)
             if !models.isEmpty && !models.contains(where: { $0.id == configuration.model }) {
-                Label("当前 ID 不在返回列表中，请选择或核对。", systemImage: "exclamationmark.triangle").font(.caption).foregroundColor(.orange)
+                Label("当前 ID 不在返回列表中，请选择或核对。", systemImage: "exclamationmark.triangle").font(.caption).foregroundColor(TranslatorDesign.warning)
             }
             if configuration.provider == .deepseek {
                 Text("实时翻译优先选 Flash。显示名和 API ID 可能不同，获取后点选即可。").font(.caption).foregroundColor(.secondary)
@@ -172,7 +172,7 @@ struct APISettingsView: View {
                 }
             }
             if !result.isEmpty { Text(result).textSelection(.enabled) }
-            if !feedback.isEmpty { Text(feedback).font(.caption).foregroundColor(canActivate || saved ? .green : .orange) }
+            if !feedback.isEmpty { Text(feedback).font(.caption).foregroundColor(canActivate || saved ? TranslatorDesign.success : TranslatorDesign.warning) }
         }.glassPanel()
     }
     private var activationPanel: some View {
