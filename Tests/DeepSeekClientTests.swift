@@ -1,0 +1,84 @@
+import XCTest
+@testable import ConversationTranslator
+
+private final class TranslationURLProtocol: URLProtocol {
+    static var status = 200
+    static var body = ""
+    static var capturedRequest: URLRequest?
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.capturedRequest = request
+        let response = HTTPURLResponse(url: request.url!, statusCode: Self.status,
+                                       httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"])!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        // Deliver every UTF-8 byte separately, including split Chinese code points.
+        for byte in Self.body.utf8 { client?.urlProtocol(self, didLoad: Data([byte])) }
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+@MainActor
+final class DeepSeekClientTests: XCTestCase {
+    private var session: URLSession!
+    override func setUp() {
+        super.setUp()
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [TranslationURLProtocol.self]
+        session = URLSession(configuration: config)
+        TranslationURLProtocol.status = 200
+        TranslationURLProtocol.body = ""
+        TranslationURLProtocol.capturedRequest = nil
+    }
+    override func tearDown() {
+        session.invalidateAndCancel(); session = nil
+        super.tearDown()
+    }
+    private func event(_ value: String) -> String { "data: \(value)\r\n\r\n" }
+    private func translate(onDelta: @escaping @MainActor (String) -> Void) async throws {
+        try await DeepSeekClient(session: session).translate(text: "Where is the station?",
+                source: SpokenLanguage.all[1], target: SpokenLanguage.all[0], key: "test-only-key", onDelta: onDelta)
+    }
+    func testStreamedUnicodeAndOfficialEndpoint() async throws {
+        TranslationURLProtocol.body = ": keepalive\r\n\r\n"
+            + event("{\"choices\":[{\"delta\":{\"content\":\"车站\"},\"finish_reason\":null}]}")
+            + event("{\"choices\":[{\"delta\":{\"content\":\"在哪里？\"},\"finish_reason\":null}]}")
+            + event("{\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}")
+            + event("[DONE]")
+        var translation = ""
+        try await translate { translation += $0 }
+        XCTAssertEqual(translation, "车站在哪里？")
+        let request = try XCTUnwrap(TranslationURLProtocol.capturedRequest)
+        XCTAssertEqual(request.url?.absoluteString, "https://api.deepseek.com/chat/completions")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-only-key")
+        XCTAssertEqual(request.httpMethod, "POST")
+    }
+    func testIncompleteStreamIsRejected() async {
+        TranslationURLProtocol.body = event("{\"choices\":[{\"delta\":{\"content\":\"车站\"},\"finish_reason\":null}]}")
+        do { try await translate { _ in }; XCTFail("An incomplete translation must fail") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("未完整")) }
+    }
+    func testAuthenticationFailureDoesNotEmitText() async {
+        TranslationURLProtocol.status = 401
+        TranslationURLProtocol.body = "unauthorized"
+        var emitted = false
+        do { try await translate { _ in emitted = true }; XCTFail("Invalid key must fail") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("密钥")) }
+        XCTAssertFalse(emitted)
+    }
+    func testTruncatedTranslationIsRejected() async {
+        TranslationURLProtocol.body = event("{\"choices\":[{\"delta\":{\"content\":\"车站\"},\"finish_reason\":null}]}")
+            + event("{\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}") + event("[DONE]")
+        do { try await translate { _ in }; XCTFail("Truncated translation must fail") }
+        catch { XCTAssertTrue(error.localizedDescription.contains("长度")) }
+    }
+    func testEmptyKeyMakesNoRequest() async {
+        do {
+            try await DeepSeekClient(session: session).translate(text: "Hello", source: SpokenLanguage.all[1],
+                        target: SpokenLanguage.all[0], key: "") { _ in XCTFail("No translation expected") }
+            XCTFail("Empty key must fail")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("密钥")) }
+        XCTAssertNil(TranslationURLProtocol.capturedRequest)
+    }
+}

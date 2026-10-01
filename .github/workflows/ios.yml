@@ -1,0 +1,38 @@
+name: iOS checks and unsigned IPA
+"on":
+  workflow_dispatch:
+  push:
+    branches: [translator-ios-build]
+permissions:
+  contents: read
+jobs:
+  ios:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show Xcode version
+        run: xcodebuild -version
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Generate project
+        run: xcodegen generate
+      - name: Test on an available iPhone simulator
+        shell: bash
+        run: |
+          DEVICE_ID=$(python3 - <<'PY'
+          import json, subprocess
+          devices = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))['devices']
+          matches = [d['udid'] for group in devices.values() for d in group if d.get('isAvailable') and d['name'].startswith('iPhone')]
+          if not matches:
+              raise SystemExit('No iPhone simulator available')
+          print(matches[0])
+          PY
+          )
+          xcodebuild -project ConversationTranslator.xcodeproj -scheme ConversationTranslator -destination "platform=iOS Simulator,id=$DEVICE_ID" CODE_SIGNING_ALLOWED=NO test
+      - name: Build unsigned IPA
+        run: ./scripts/build-ipa.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ConversationTranslator-unsigned
+          path: dist/*
+          if-no-files-found: error
