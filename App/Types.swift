@@ -114,7 +114,7 @@ enum APIProvider: String, CaseIterable, Codable, Identifiable {
     }
     var model: String {
         switch self {
-        case .deepseek: return "deepseek-flash"
+        case .deepseek: return "deepseek-v4-pro"
         case .openai: return "gpt-4.1-mini"
         case .anthropic: return "claude-sonnet-4-20250514"
         case .gemini: return "gemini-2.5-flash"

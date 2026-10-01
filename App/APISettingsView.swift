@@ -102,6 +102,11 @@ struct APISettingsView: View {
                 ForEach(APIWireFormat.allCases) { Text($0.name).tag($0) }
             }.pickerStyle(.menu).disabled(busy)
                 .onChange(of: configuration.format) { _ in models = []; modelSearch = ""; modelFeedback = "" }
+            Button("恢复该服务的默认配置") {
+                configuration = .preset(configuration.provider)
+                models = []; modelSearch = ""; modelFeedback = ""
+                invalidateTest()
+            }.font(.caption).disabled(busy)
             Text("API 地址").font(.caption).foregroundColor(.secondary)
             TextField("https://…/v1", text: $configuration.baseURL).keyboardType(.URL)
                 .textInputAutocapitalization(.never).disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(busy)
@@ -144,7 +149,7 @@ struct APISettingsView: View {
                 Label("当前 ID 不在返回列表中，请选择或核对。", systemImage: "exclamationmark.triangle").font(.caption).foregroundColor(TranslatorDesign.warning)
             }
             if configuration.provider == .deepseek {
-                Text("实时翻译优先选 Flash。显示名和 API ID 可能不同，获取后点选即可。").font(.caption).foregroundColor(.secondary)
+                Text("显示名和 API ID 可能不同，获取后点选即可。优先使用能通过翻译测试的模型。").font(.caption).foregroundColor(.secondary)
             }
         }.glassPanel()
     }

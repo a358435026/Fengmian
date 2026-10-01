@@ -95,7 +95,7 @@ final class DeepSeekClientTests: XCTestCase {
         XCTAssertTrue(messages[0]["content"]?.contains("negation") == true)
         XCTAssertTrue(messages[0]["content"]?.contains("shipping quotation") == true)
         XCTAssertEqual(messages.last?["content"], "Where is the station?")
-        XCTAssertEqual(payload["model"] as? String, "deepseek-flash")
+        XCTAssertEqual(payload["model"] as? String, "deepseek-v4-pro")
         XCTAssertEqual((payload["thinking"] as? [String: String])?["type"], "disabled")
     }
     func testIncompleteStreamIsRejected() async {
