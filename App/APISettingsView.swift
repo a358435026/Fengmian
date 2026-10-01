@@ -3,11 +3,13 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var model: ConversationModel
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("darkAppearance") private var darkAppearance = false
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("个性化配置，让沟通更自然").foregroundColor(.secondary)
+                    Text("清晰、自然，按你的习惯沟通").foregroundColor(.secondary)
+                    Toggle("深色模式", isOn: $darkAppearance).glassPanel()
                     NavigationLink(destination: APISettingsView()) {
                         HStack {
                             Image(systemName: "server.rack").foregroundColor(TranslatorDesign.blue)
@@ -16,7 +18,7 @@ struct SettingsView: View {
                                 Text("官方服务 · 自定义中转 · 翻译测试").font(.caption).foregroundColor(.secondary)
                             }
                             Spacer(); Image(systemName: "chevron.right")
-                        }.foregroundColor(.white).glassPanel()
+                        }.foregroundColor(.primary).glassPanel()
                     }
                     VStack(alignment: .leading, spacing: 10) {
                         Label("持续双向对话", systemImage: "bubble.left.and.bubble.right.fill").font(.headline)
@@ -43,7 +45,7 @@ struct SettingsView: View {
                 }.padding()
             }.background(TranslatorDesign.background.ignoresSafeArea()).navigationTitle("设置")
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
-        }.navigationViewStyle(.stack).preferredColorScheme(.dark).accentColor(TranslatorDesign.blue)
+        }.navigationViewStyle(.stack).preferredColorScheme(darkAppearance ? .dark : .light).accentColor(TranslatorDesign.blue)
     }
 }
 
@@ -51,77 +53,169 @@ struct APISettingsView: View {
     @State private var configuration = APIConfiguration.load()
     @State private var key = ""
     @State private var feedback = ""
+    @State private var modelFeedback = ""
     @State private var testText = "您好，请问我们明天几点见面？"
     @State private var result = ""
     @State private var testing = false
+    @State private var loadingModels = false
     @State private var testTask: Task<Void, Never>?
+    @State private var testStarted: Date?
+    @State private var modelsTask: Task<Void, Never>?
+    @State private var models: [APIModel] = []
+    @State private var modelSearch = ""
+    @State private var testedConfiguration: APIConfiguration?
+    @State private var testedKey = ""
+    @State private var saved = false
+    private var busy: Bool { testing || loadingModels }
+    private var canActivate: Bool { testedConfiguration == configuration && testedKey == key && !busy }
+    private var visibleModels: [APIModel] {
+        models.filter { modelSearch.isEmpty || $0.id.localizedCaseInsensitiveContains(modelSearch) || $0.name.localizedCaseInsensitiveContains(modelSearch) }
+    }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                Text("填写密钥 → 获取模型 → 选择 → 测试 → 启用").font(.subheadline).foregroundColor(.secondary)
                 servicePanel
                 credentialsPanel
+                modelsPanel
                 testPanel
-                Text("预设仅提供默认地址和模型，请以服务商账户可用模型为准。自定义中转需选择其实际协议；API 地址为 Base URL 或兼容协议的完整端点，Gemini 填版本 Base URL。第三方服务会接收测试和翻译文本。").font(.caption).foregroundColor(.secondary)
+                activationPanel
+                Text("模型列表来自你配置的服务器。部分中转不提供列表，仍可手填其文档中的准确模型 ID。接口返回模型不代表都有权限或余额，需测试后启用。第三方服务会接收测试及翻译文字。").font(.caption).foregroundColor(.secondary)
             }.padding()
-        }.background(TranslatorDesign.background.ignoresSafeArea()).navigationTitle("API / 模型配置")
+        }.background(TranslatorDesign.background.ignoresSafeArea()).navigationTitle("翻译模型")
             .onAppear { key = KeyStore.read(provider: configuration.provider) }
-            .onDisappear { testTask?.cancel() }
+            .onDisappear { testTask?.cancel(); modelsTask?.cancel() }
+            .onChange(of: configuration) { _ in invalidateTest() }
+            .onChange(of: key) { _ in models = []; modelSearch = ""; modelFeedback = ""; invalidateTest() }
     }
     private var servicePanel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("翻译服务", systemImage: "server.rack").font(.headline)
+            Label("服务与地址", systemImage: "server.rack").font(.headline)
             Picker("服务商", selection: $configuration.provider) {
                 ForEach(APIProvider.allCases) { Text($0.name).tag($0) }
-            }.pickerStyle(.menu).disabled(testing)
+            }.pickerStyle(.menu).disabled(busy)
                 .onChange(of: configuration.provider) { provider in
                     configuration = .preset(provider); key = KeyStore.read(provider: provider)
-                    feedback = ""; result = ""
+                    models = []; modelSearch = ""; modelFeedback = ""; feedback = ""; result = ""
                 }
             Picker("API 协议", selection: $configuration.format) {
                 ForEach(APIWireFormat.allCases) { Text($0.name).tag($0) }
-            }.pickerStyle(.menu).disabled(testing)
+            }.pickerStyle(.menu).disabled(busy)
+                .onChange(of: configuration.format) { _ in models = []; modelSearch = ""; modelFeedback = "" }
             Text("API 地址").font(.caption).foregroundColor(.secondary)
             TextField("https://…/v1", text: $configuration.baseURL).keyboardType(.URL)
-                .textInputAutocapitalization(.never).disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(testing)
-            Text("模型 ID").font(.caption).foregroundColor(.secondary)
-            TextField("例如 deepseek-chat", text: $configuration.model).textInputAutocapitalization(.never)
-                .disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(testing)
+                .textInputAutocapitalization(.never).disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(busy)
+                .onChange(of: configuration.baseURL) { _ in models = []; modelSearch = ""; modelFeedback = "" }
+            Text("OpenAI 兼容地址填到 /v1 或完整 /chat/completions；DeepSeek 官方可直接填 https://api.deepseek.com。").font(.caption).foregroundColor(.secondary)
         }.glassPanel()
     }
     private var credentialsPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("密钥与保存", systemImage: "key.fill").font(.headline)
-            SecureField("API 密钥", text: $key).textInputAutocapitalization(.never).disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(testing)
-            Button("保存并启用此配置") {
-                do {
-                    _ = try configuration.requestURL()
-                    try KeyStore.save(key.trimmingCharacters(in: .whitespacesAndNewlines), provider: configuration.provider)
-                    try configuration.save(); feedback = "已保存。请点击下方测试验证实际翻译。"
-                } catch { feedback = error.localizedDescription }
-            }.buttonStyle(.borderedProminent).disabled(testing)
-            if !feedback.isEmpty { Text(feedback).font(.caption).foregroundColor(.orange) }
+            Label("API 密钥", systemImage: "key.fill").font(.headline)
+            SecureField("粘贴你的密钥", text: $key).textInputAutocapitalization(.never).disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(busy)
+            Text("密钥只在本机保存，不会放进导出文件。").font(.caption).foregroundColor(.secondary)
+            Button(action: fetchModels) {
+                HStack { if loadingModels { ProgressView() }; Label(loadingModels ? "正在获取模型…" : "获取可用模型", systemImage: "arrow.clockwise") }
+            }.buttonStyle(.borderedProminent).disabled(busy || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if !modelFeedback.isEmpty { Text(modelFeedback).font(.caption).foregroundColor(models.isEmpty ? .orange : .secondary) }
         }.glassPanel()
+    }
+    private var modelsPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("选择翻译模型", systemImage: "square.stack.3d.up").font(.headline)
+            if !models.isEmpty {
+                TextField("搜索模型", text: $modelSearch).textFieldStyle(.roundedBorder).disabled(busy)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        if visibleModels.isEmpty { Text("没有匹配模型，请清空搜索词。").font(.caption).foregroundColor(.secondary) }
+                        ForEach(visibleModels) { model in
+                            Button { configuration.model = model.id } label: {
+                                modelRow(model)
+                            }.buttonStyle(.plain).disabled(busy)
+                            Divider()
+                        }
+                    }
+                }.frame(maxHeight: 210)
+            }
+            Text("当前模型 ID（可手动输入，区分大小写）").font(.caption).foregroundColor(.secondary)
+            TextField("例如 deepseek-flash", text: $configuration.model).textInputAutocapitalization(.never)
+                .disableAutocorrection(true).textFieldStyle(.roundedBorder).disabled(busy)
+            if !models.isEmpty && !models.contains(where: { $0.id == configuration.model }) {
+                Label("当前 ID 不在返回列表中，请选择或核对。", systemImage: "exclamationmark.triangle").font(.caption).foregroundColor(.orange)
+            }
+            if configuration.provider == .deepseek {
+                Text("实时翻译优先选 Flash。显示名和 API ID 可能不同，获取后点选即可。").font(.caption).foregroundColor(.secondary)
+            }
+        }.glassPanel()
+    }
+    private func modelRow(_ model: APIModel) -> some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.name).font(.subheadline.weight(.medium)).foregroundColor(.primary)
+                if model.name != model.id { Text(model.id).font(.caption).foregroundColor(.secondary) }
+            }
+            Spacer()
+            Image(systemName: configuration.model == model.id ? "checkmark.circle.fill" : "circle").foregroundColor(TranslatorDesign.blue)
+        }.padding(.vertical, 10).contentShape(Rectangle())
     }
     private var testPanel: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("实际翻译测试 · 中文 → 英语", systemImage: "checkmark.shield").font(.headline)
-            TextEditor(text: $testText).frame(height: 75).cornerRadius(10).disabled(testing)
+            Label("测试翻译 · 中文 → 英语", systemImage: "checkmark.shield").font(.headline)
+            TextEditor(text: $testText).frame(height: 75).cornerRadius(10).disabled(busy)
             Button(action: test) {
-                HStack { if testing { ProgressView() }; Text(testing ? "正在请求 API…" : "测试连接与翻译") }
-            }.buttonStyle(.borderedProminent).disabled(testing || testText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                HStack { if testing { ProgressView() }; Text(testing ? "正在请求译文…" : "测试连接与翻译") }
+            }.buttonStyle(.borderedProminent).disabled(busy || key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || configuration.model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || testText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if testing, let started = testStarted {
+                TimelineView(.periodic(from: started, by: 1)) { clock in
+                    Text("已等待 \(Int(max(0, clock.date.timeIntervalSince(started)))) 秒 · 最长等待 60 秒")
+                        .font(.caption).foregroundColor(.secondary)
+                }
+            }
             if !result.isEmpty { Text(result).textSelection(.enabled) }
-            Text("测试使用当前填写的配置，不会自动保存，也不会写入对话记录。").font(.caption).foregroundColor(.secondary)
+            if !feedback.isEmpty { Text(feedback).font(.caption).foregroundColor(canActivate || saved ? .green : .orange) }
         }.glassPanel()
     }
+    private var activationPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button("保存并启用此配置") {
+                do {
+                    try KeyStore.save(key.trimmingCharacters(in: .whitespacesAndNewlines), provider: configuration.provider)
+                    try configuration.save(); saved = true; feedback = "已启用，返回对话即可使用。"
+                } catch { feedback = error.localizedDescription }
+            }.buttonStyle(.borderedProminent).disabled(!canActivate)
+            Text("成功收到完整译文后才能启用。获取模型和测试不会覆盖之前可用的配置。").font(.caption).foregroundColor(.secondary)
+        }.glassPanel()
+    }
+    private func invalidateTest() {
+        testedConfiguration = nil; testedKey = ""; saved = false; result = ""; feedback = ""
+    }
+    private func fetchModels() {
+        loadingModels = true; models = []; modelSearch = ""; modelFeedback = ""
+        let config = configuration; let credential = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        modelsTask = Task { @MainActor in
+            defer { loadingModels = false }
+            do {
+                let received = try await DeepSeekClient().fetchModels(configuration: config, key: credential)
+                guard !Task.isCancelled else { return }
+                models = received
+                modelFeedback = "获取到 \(received.count) 个模型，请点选后测试。"
+            } catch {
+                guard !Task.isCancelled else { return }
+                modelFeedback = error.localizedDescription
+            }
+        }
+    }
     private func test() {
-        testing = true; result = ""; feedback = ""
+        testing = true; testStarted = Date(); result = ""; feedback = ""; testedConfiguration = nil; saved = false
         let config = configuration; let credential = key.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = testText; let began = Date()
         testTask = Task { @MainActor in
-            defer { testing = false }
+            defer { testing = false; testStarted = nil }
             do {
                 try await DeepSeekClient().translate(text: text, source: SpokenLanguage.all[0], target: SpokenLanguage.all[1], key: credential, configuration: config) { result += $0 }
-                feedback = String(format: "测试成功 · 总耗时 %.2f 秒。保存后用于对话。", Date().timeIntervalSince(began))
+                guard !Task.isCancelled else { return }
+                testedConfiguration = config; testedKey = key
+                feedback = String(format: "测试成功 · %.2f 秒。现在可以保存启用。", Date().timeIntervalSince(began))
             } catch {
                 guard !Task.isCancelled else { return }
                 result = ""; feedback = "测试失败：" + error.localizedDescription

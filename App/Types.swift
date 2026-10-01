@@ -114,7 +114,7 @@ enum APIProvider: String, CaseIterable, Codable, Identifiable {
     }
     var model: String {
         switch self {
-        case .deepseek: return "deepseek-chat"
+        case .deepseek: return "deepseek-flash"
         case .openai: return "gpt-4.1-mini"
         case .anthropic: return "claude-sonnet-4-20250514"
         case .gemini: return "gemini-2.5-flash"
@@ -146,27 +146,59 @@ struct APIConfiguration: Codable, Equatable {
     }
     func save() throws {
         _ = try requestURL()
-        UserDefaults.standard.set(try JSONEncoder().encode(self), forKey: "translationAPIConfiguration")
+        var value = self
+        value.baseURL = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        value.model = modelID
+        UserDefaults.standard.set(try JSONEncoder().encode(value), forKey: "translationAPIConfiguration")
     }
+    var modelID: String { model.trimmingCharacters(in: .whitespacesAndNewlines) }
     func requestURL() throws -> URL {
-        let clean = baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard let base = URLComponents(string: clean), base.scheme == "https", base.host != nil,
-              base.user == nil, base.password == nil, base.query == nil, base.fragment == nil else {
-            throw TranslatorError.message("API 地址需为 HTTPS，不能包含密钥、查询参数或用户名")
+        var components = try rootComponents()
+        guard !modelID.isEmpty else { throw TranslatorError.message("请选择或填写模型 ID") }
+        guard modelID.rangeOfCharacter(from: .controlCharacters) == nil else {
+            throw TranslatorError.message("模型 ID 不能包含换行或控制字符")
         }
-        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !model.isEmpty else { throw TranslatorError.message("请填写模型名称") }
-        let endpoint: String
         switch format {
-        case .openai: endpoint = clean.hasSuffix("/chat/completions") ? clean : clean + "/chat/completions"
-        case .anthropic: endpoint = clean.hasSuffix("/messages") ? clean : clean + "/messages"
+        case .openai: components.path += "/chat/completions"
+        case .anthropic: components.path += "/messages"
         case .gemini:
-            guard !model.contains("/"), !model.contains(":"), !model.contains("?"), !model.contains("#") else {
+            guard !modelID.contains("/"), !modelID.contains(":"), !modelID.contains("?"), !modelID.contains("#") else {
                 throw TranslatorError.message("Gemini 模型名称只填模型 ID，不填 URL")
             }
-            endpoint = clean + "/models/" + model + ":generateContent"
+            components.path += "/models/" + modelID + ":generateContent"
         }
-        guard let url = URL(string: endpoint) else { throw TranslatorError.message("API 地址无效") }
+        guard let url = components.url else { throw TranslatorError.message("API 地址无效") }
         return url
     }
+    // Model discovery deliberately works before a model has been selected.
+    func modelsURL() throws -> URL {
+        var components = try rootComponents()
+        components.path += "/models"
+        guard let url = components.url else { throw TranslatorError.message("API 地址无效") }
+        return url
+    }
+    private func rootComponents() throws -> URLComponents {
+        let clean = baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard var components = URLComponents(string: clean), components.scheme?.lowercased() == "https",
+              let host = components.host, !host.isEmpty, components.user == nil, components.password == nil,
+              components.query == nil, components.fragment == nil else {
+            throw TranslatorError.message("API 地址需为 HTTPS，不能包含密钥、查询参数或用户名")
+        }
+        components.path = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !components.path.isEmpty { components.path = "/" + components.path }
+        for suffix in ["/chat/completions", "/messages", "/models"] where components.path.hasSuffix(suffix) {
+            components.path.removeLast(suffix.count)
+            break
+        }
+        if format == .gemini, let range = components.path.range(of: "/models/", options: .backwards),
+           components.path.hasSuffix(":generateContent") || components.path.hasSuffix(":streamGenerateContent") {
+            components.path = String(components.path[..<range.lowerBound])
+        }
+        return components
+    }
+}
+
+struct APIModel: Identifiable, Hashable, Sendable {
+    let id: String
+    let name: String
 }

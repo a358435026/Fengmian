@@ -26,6 +26,10 @@ jobs:
         run: ./scripts/build-ipa.sh
       - name: Verify IPA minimum version and architecture
         run: python3 scripts/verify-ipa.py dist/ConversationTranslator-unsigned.ipa > dist/verification.json
+      - name: Best-effort simulator home screenshot
+        continue-on-error: true
+        timeout-minutes: 4
+        run: bash ./scripts/preview-ios.sh
       - uses: actions/upload-artifact@v4
         with:
           name: ConversationTranslator-unsigned
