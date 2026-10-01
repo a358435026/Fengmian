@@ -74,8 +74,8 @@ try:
     app = Path('build-preview/Build/Products/Debug-iphonesimulator/ConversationTranslator.app')
     if not app.is_dir():
         raise RuntimeError('Simulator build did not produce the app')
-    # Cap the entire boot operation, not just one of its commands, at 50 seconds.
-    boot_deadline = time.monotonic() + 50
+    # Cap cold simulator startup at 100 seconds; the overall preview budget still applies.
+    boot_deadline = time.monotonic() + 100
     if chosen.get('state') != 'Booted':
         run(['xcrun', 'simctl', 'boot', udid], 10)
         booted_here = True
