@@ -1,10 +1,10 @@
 {
-  "file": "dist/ConversationTranslator-unsigned.ipa",
-  "bytes": 465372,
-  "sha256": "cf9c24777996c792fa774be63c305c868f12dbbd3b1ae74d986b8c88010d1e43",
+  "file": "releases/ConversationTranslator-v0.4.0-b9-iOS15.ipa",
+  "bytes": 606759,
+  "sha256": "037a433dba61643d59d5c69fb873c90e3c09b076e91142e03f0ea26e5f969efd",
   "bundle_id": "local.conversation.translator",
-  "version": "0.3.0",
-  "build": "8",
+  "version": "0.4.0",
+  "build": "9",
   "minimum_plist_ios": "15.0",
   "architecture": "arm64",
   "minimum_binary_ios": "15.0.0",
@@ -147,6 +147,10 @@
     },
     {
       "path": "/usr/lib/swift/libswiftFoundation.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreGraphics.dylib",
       "weak": false
     },
     {

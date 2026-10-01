@@ -1,0 +1,4 @@
+{
+  "success": false,
+  "error": "xcrun simctl timed out after at most 12 seconds"
+}
