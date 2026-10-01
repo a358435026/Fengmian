@@ -1,28 +1,30 @@
-# 验证记录
+# 0.2.0（build 7）验证记录
 
 验证日期：2026-10-01。
 
+[最终构建](https://github.com/a358435026/Fengmian/actions/runs/36915885041)，源代码提交 `6c44da175892aab8dd5ed18b8b18630d911165df`。
+
 ## 已执行
 
-- GitHub macOS runner，Xcode 16.4 / iOS 18.5 SDK，deployment target iOS 15.0。
-- 模拟器 XCTest：7 tests，0 failures；包括 UTF-8 分片/SSE 事件、完整译文、认证失败、无 Key、截断、连接未完成。接口测试使用本机 URLProtocol mock，没有真实 API 费用。
-- iphoneos Release 编译成功，生成 IPA。
-- IPA 检查：标准 Payload/*.app，Info.plist MinimumOSVersion 15.0，Mach-O arm64 最低版本 15.0.0。
-- 麦克风与 Speech 权限说明存在。Translation.framework 是 LC_LOAD_WEAK_DYLIB，可选加载。
-- IPA 内主可执行文件权限为可执行，未打包 .env 文件。
-- Python 探针和 IPA 校验器语法检查、构建脚本/workflow shell 语法检查通过。
+- macOS GitHub runner，Xcode 16.4，iOS 18.5 SDK。
+- 相同核心源文件的 SwiftPM XCTest：14 项、0 失败；流式 UTF-8/SSE、认证/空 Key/截断/中断、双语保守判定、收句、M4A+TXT+JSON 保存、待确认标记、不覆盖已有文件。
+- 录音导出测试使用合成音频，翻译接口使用 URLProtocol mock；未调用真实 Apple Speech 或 DeepSeek。
+- 最终 iphoneos Release 编译成功，全部 SwiftUI 和 SpeechService 源码参与编译。
+- 生成标准 Payload/*.app IPA，最低 Info.plist iOS 15.0；Mach-O arm64 最低 iOS 15.0.0。
+- 版本 0.2.0、build 7；麦克风与语音识别权限描述存在；主可执行文件 0755；不含 XCTest bundle。
+- 下载的 IPA 和 GitHub runner 的 SHA-256 一致。
+- 新版不依赖 iOS 18 Translation.framework。
+- 原仓库主分支 SHA 保持 `7fd66d3351020fff17a6b1c98000b0d576d0cb0e`，只修改独立分支。
 
-[构建与测试日志](https://github.com/a358435026/Fengmian/actions/runs/36906252475)
+SHA-256：`5c52ed2cabe23da79b24e4fc626f3788311c08ea7390d551f4aca822f5da208d`。
 
-构建分支：translator-ios-build，远程源码提交：0b2c627ab1ed5ad0108aba42089b66193f7ad81e。主分支保持不变。
+## 未执行与实际限制
 
-IPA SHA-256：`dcc159a943f914a50a1cc707c6c33bd8ac61d1928aadeff85eab3f066e0160b3`。
+- 新版实体 iOS 15 巨魔安装、权限/Keychain/麦克风/播报、持续双语系统识别。
+- 真实音频 WER/CER、语言方向错误率、待确认比例、完整 P50/P95；不能据此承诺识别率提升或零点几秒端到端。
+- 两个系统 ASR 的稳定并发与系统服务请求限制，仍需实测。
+- 本机保存位于 App 私有 Documents，通过 App 内导出访问；不声称“文件”自动出现 App 根目录。
+- 默认不播报；自动播报会暂缓识别。手动锁屏/退后台会结束，录音期间防止自动锁屏。
+- iOS 15 文字翻译仍使用 DeepSeek，不提供离线翻译包。
 
-## 未执行
-
-- 实体 iOS 15 巨魔安装与启动、Keychain 保存、麦克风/识别/播报/音频路由验收。
-- 真实 DeepSeek 调用、余额/网络/端到端时延测试：用户密钥仅在安装后由用户填写。
-- iOS 18 语言包下载和断网测试；iOS 15 使用 DeepSeek 文字翻译。
-- 双语自动语音判断和旧系统离线第三方翻译模型尚未实现，本版以两侧语言按钮明确方向。
-
-模拟器测试与最低系统静态检查，不代表已在 iOS 15 真机完成验收。
+一次早期 iOS 模拟器尝试卡在启动阶段并被取消；后续核心测试在 macOS 运行，不能标为新版 iOS 模拟器或真机识别测试已通过。

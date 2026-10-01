@@ -1,10 +1,10 @@
 {
   "file": "dist/ConversationTranslator-unsigned.ipa",
-  "bytes": 240920,
-  "sha256": "dcc159a943f914a50a1cc707c6c33bd8ac61d1928aadeff85eab3f066e0160b3",
+  "bytes": 368992,
+  "sha256": "5c52ed2cabe23da79b24e4fc626f3788311c08ea7390d551f4aca822f5da208d",
   "bundle_id": "local.conversation.translator",
-  "version": "0.1.0",
-  "build": "2",
+  "version": "0.2.0",
+  "build": "7",
   "minimum_plist_ios": "15.0",
   "architecture": "arm64",
   "minimum_binary_ios": "15.0.0",
@@ -26,11 +26,19 @@
       "weak": false
     },
     {
+      "path": "/System/Library/Frameworks/AVFoundation.framework/AVFoundation",
+      "weak": false
+    },
+    {
       "path": "/System/Library/Frameworks/Combine.framework/Combine",
       "weak": false
     },
     {
       "path": "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/NaturalLanguage.framework/NaturalLanguage",
       "weak": false
     },
     {
@@ -46,12 +54,8 @@
       "weak": false
     },
     {
-      "path": "/System/Library/Frameworks/Translation.framework/Translation",
-      "weak": true
-    },
-    {
-      "path": "/System/Library/Frameworks/_Translation_SwiftUI.framework/_Translation_SwiftUI",
-      "weak": true
+      "path": "/System/Library/Frameworks/UIKit.framework/UIKit",
+      "weak": false
     },
     {
       "path": "/usr/lib/libc++.1.dylib",
@@ -67,7 +71,7 @@
     },
     {
       "path": "/usr/lib/swift/libswiftCoreAudio.dylib",
-      "weak": true
+      "weak": false
     },
     {
       "path": "/usr/lib/swift/libswiftCoreFoundation.dylib",
@@ -95,11 +99,15 @@
     },
     {
       "path": "/usr/lib/swift/libswiftDispatch.dylib",
-      "weak": true
+      "weak": false
     },
     {
       "path": "/usr/lib/swift/libswiftMetal.dylib",
       "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftNaturalLanguage.dylib",
+      "weak": false
     },
     {
       "path": "/usr/lib/swift/libswiftOSLog.dylib",
