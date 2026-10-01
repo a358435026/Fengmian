@@ -28,3 +28,11 @@ SHA-256：`5c52ed2cabe23da79b24e4fc626f3788311c08ea7390d551f4aca822f5da208d`。
 - iOS 15 文字翻译仍使用 DeepSeek，不提供离线翻译包。
 
 一次早期 iOS 模拟器尝试卡在启动阶段并被取消；后续核心测试在 macOS 运行，不能标为新版 iOS 模拟器或真机识别测试已通过。
+
+## v0.3.0 build 8（2026-10-01）
+
+- 构建代码：550f5db6356fd3af778b060f6159656aa6ba1f7c。
+- GitHub Actions：https://github.com/a358435026/Fengmian/actions/runs/36920641878。
+- 核心测试 18 项，零失败；iOS arm64 Release 编译成功；IPA 最低 iOS 15 检查通过。
+- 官方/中转协议由模拟 HTTP 响应测试；没有使用用户真实密钥，不声称已通过所有服务商在线账户测试。
+- UI 根据参考图实现，尚未完成 iOS 15 真机视觉、持续收音与识别准确率验收。

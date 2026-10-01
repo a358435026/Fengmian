@@ -1,0 +1,91 @@
+Building for debugging...
+[0/7] /Users/runner/work/Fengmian/Fengmian/.build/arm64-apple-macosx/debug/ConversationTranslatorCorePackageTests.derived/runner.swift
+[0/7] Write sources
+[4/7] Write swift-version--79AA4F9932D1E87A.txt
+[6/11] Emitting module ConversationTranslator
+[7/11] Compiling ConversationTranslator DeepSeekClient.swift
+[8/11] Compiling ConversationTranslator LocalArchive.swift
+[9/11] Compiling ConversationTranslator RecognitionPolicy.swift
+[10/12] Compiling ConversationTranslator Types.swift
+[11/16] Compiling ConversationTranslatorTests DeepSeekClientTests.swift
+/Users/runner/work/Fengmian/Fengmian/Tests/LocalArchiveTests.swift:33:36: warning: 'duration' was deprecated in macOS 13.0: Use load(.duration) instead
+31 |         XCTAssertTrue(text.contains("Do not ship before Friday"))
+32 |         let audio = AVURLAsset(url: LocalArchive.folder(record).appendingPathComponent("audio.m4a"))
+33 |         XCTAssertGreaterThan(audio.duration.seconds, 0)
+   |                                    `- warning: 'duration' was deprecated in macOS 13.0: Use load(.duration) instead
+34 |     }
+35 |     func testSaveDoesNotOverwriteExistingRecording() async throws {
+[12/16] Compiling ConversationTranslatorTests LocalArchiveTests.swift
+/Users/runner/work/Fengmian/Fengmian/Tests/LocalArchiveTests.swift:33:36: warning: 'duration' was deprecated in macOS 13.0: Use load(.duration) instead
+31 |         XCTAssertTrue(text.contains("Do not ship before Friday"))
+32 |         let audio = AVURLAsset(url: LocalArchive.folder(record).appendingPathComponent("audio.m4a"))
+33 |         XCTAssertGreaterThan(audio.duration.seconds, 0)
+   |                                    `- warning: 'duration' was deprecated in macOS 13.0: Use load(.duration) instead
+34 |     }
+35 |     func testSaveDoesNotOverwriteExistingRecording() async throws {
+[13/17] Emitting module ConversationTranslatorTests
+[14/17] Compiling ConversationTranslatorTests RecognitionPolicyTests.swift
+[15/17] Compiling ConversationTranslatorTests SSEParserTests.swift
+[16/19] Compiling ConversationTranslatorCorePackageTests runner.swift
+[17/19] Emitting module ConversationTranslatorCorePackageTests
+[17/19] Write Objects.LinkFileList
+[18/19] Linking ConversationTranslatorCorePackageTests
+Build complete! (26.28s)
+Test Suite 'All tests' started at 2026-10-01 20:19:33.952.
+Test Suite 'ConversationTranslatorCorePackageTests.xctest' started at 2026-10-01 20:19:33.955.
+Test Suite 'DeepSeekClientTests' started at 2026-10-01 20:19:33.955.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testAnthropicNativeResponseAndHeaders]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testAnthropicNativeResponseAndHeaders]' passed (0.022 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testAuthenticationFailureDoesNotEmitText]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testAuthenticationFailureDoesNotEmitText]' passed (0.004 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testEmptyKeyMakesNoRequest]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testEmptyKeyMakesNoRequest]' passed (0.001 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testGeminiNativeResponseAndHeaders]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testGeminiNativeResponseAndHeaders]' passed (0.002 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testIncompleteStreamIsRejected]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testIncompleteStreamIsRejected]' passed (0.003 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testRelayEndpointAndCustomModel]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testRelayEndpointAndCustomModel]' passed (0.002 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testStreamedUnicodeAndOfficialEndpoint]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testStreamedUnicodeAndOfficialEndpoint]' passed (0.003 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testTruncatedTranslationIsRejected]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testTruncatedTranslationIsRejected]' passed (0.002 seconds).
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testUnsafeAddressRejectedBeforeSendingCredential]' started.
+Test Case '-[ConversationTranslatorTests.DeepSeekClientTests testUnsafeAddressRejectedBeforeSendingCredential]' passed (0.001 seconds).
+Test Suite 'DeepSeekClientTests' passed at 2026-10-01 20:19:33.996.
+	 Executed 9 tests, with 0 failures (0 unexpected) in 0.040 (0.041) seconds
+Test Suite 'LocalArchiveTests' started at 2026-10-01 20:19:33.996.
+Test Case '-[ConversationTranslatorTests.LocalArchiveTests testRecordingAndUncertainTranscriptsRoundTripLocally]' started.
+Test Case '-[ConversationTranslatorTests.LocalArchiveTests testRecordingAndUncertainTranscriptsRoundTripLocally]' passed (0.340 seconds).
+Test Case '-[ConversationTranslatorTests.LocalArchiveTests testSaveDoesNotOverwriteExistingRecording]' started.
+Test Case '-[ConversationTranslatorTests.LocalArchiveTests testSaveDoesNotOverwriteExistingRecording]' passed (0.002 seconds).
+Test Suite 'LocalArchiveTests' passed at 2026-10-01 20:19:34.337.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.341 (0.341) seconds
+Test Suite 'RecognitionPolicyTests' started at 2026-10-01 20:19:34.337.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testClearLanguageEvidenceCanSelectDirection]' started.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testClearLanguageEvidenceCanSelectDirection]' passed (0.000 seconds).
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testEndpointDoesNotEndDuringVoiceOrUnstableText]' started.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testEndpointDoesNotEndDuringVoiceOrUnstableText]' passed (0.000 seconds).
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testShortOrZeroConfidenceSpeechNeedsConfirmation]' started.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testShortOrZeroConfidenceSpeechNeedsConfirmation]' passed (0.000 seconds).
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testSimilarConfidenceNeedsConfirmation]' started.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testSimilarConfidenceNeedsConfirmation]' passed (0.001 seconds).
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testSingleRecognizerOrPartialCannotBeCalledAutomaticDetection]' started.
+Test Case '-[ConversationTranslatorTests.RecognitionPolicyTests testSingleRecognizerOrPartialCannotBeCalledAutomaticDetection]' passed (0.000 seconds).
+Test Suite 'RecognitionPolicyTests' passed at 2026-10-01 20:19:34.339.
+	 Executed 5 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'SSEParserTests' started at 2026-10-01 20:19:34.339.
+Test Case '-[ConversationTranslatorTests.SSEParserTests testSeparateChunksAndDone]' started.
+Test Case '-[ConversationTranslatorTests.SSEParserTests testSeparateChunksAndDone]' passed (0.000 seconds).
+Test Case '-[ConversationTranslatorTests.SSEParserTests testWaitsForBoundaryAndPreservesMultipleDataLines]' started.
+Test Case '-[ConversationTranslatorTests.SSEParserTests testWaitsForBoundaryAndPreservesMultipleDataLines]' passed (0.000 seconds).
+Test Suite 'SSEParserTests' passed at 2026-10-01 20:19:34.339.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'ConversationTranslatorCorePackageTests.xctest' passed at 2026-10-01 20:19:34.339.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.383 (0.384) seconds
+Test Suite 'All tests' passed at 2026-10-01 20:19:34.339.
+	 Executed 18 tests, with 0 failures (0 unexpected) in 0.383 (0.388) seconds
+◇ Test run started.
+↳ Testing Library Version: 124.4
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests passed after 0.001 seconds.
