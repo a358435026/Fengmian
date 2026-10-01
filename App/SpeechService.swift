@@ -314,8 +314,9 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
             self.currentUtterance = nil
             let callback = self.onSpoken; self.onSpoken = nil
             if self.recording {
+                let token = self.generation
                 try? await Task.sleep(nanoseconds: 450_000_000)
-                guard self.recording else { return }
+                guard self.recording, self.generation == token else { return }
                 self.sink?.clearPreRoll(); self.playbackMuted = false; self.beginBatch()
             } else { try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation) }
             callback?()
