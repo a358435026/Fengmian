@@ -1,6 +1,6 @@
 import Foundation
 
-struct SpokenLanguage: Identifiable, Hashable {
+struct SpokenLanguage: Identifiable, Hashable, Codable {
     let id: String
     let name: String
     let translationCode: String
@@ -24,15 +24,36 @@ struct SpokenLanguage: Identifiable, Hashable {
         .init(id: "id-ID", name: "印尼语", translationCode: "id")
     ]
 }
-struct Turn: Identifiable {
+struct Turn: Identifiable, Codable {
     let id: UUID
-    let original: String
-    let source: SpokenLanguage
-    let target: SpokenLanguage
+    var original: String
+    var source: SpokenLanguage
+    var target: SpokenLanguage
     var translation = ""
     var elapsed: Double?
     var firstToken: Double?
     var failed = false
+    var pending = true
+    var needsConfirmation = false
+    var alternatives: [CandidateRecord] = []
+    var startedAt: Double = 0
+    var endedAt: Double = 0
+    var recognitionNote: String?
+}
+struct CandidateRecord: Codable, Identifiable {
+    var id: String { language.id }
+    let language: SpokenLanguage
+    let text: String
+    let confidence: Double
+}
+struct SavedConversation: Codable, Identifiable {
+    let id: UUID
+    let date: Date
+    let duration: Double
+    let left: SpokenLanguage
+    let right: SpokenLanguage
+    let turns: [Turn]
+    let audioFile: String
 }
 struct OfflineJob: Identifiable {
     let id: UUID

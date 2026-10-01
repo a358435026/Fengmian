@@ -3,150 +3,213 @@ import AVFoundation
 
 @MainActor
 final class ConversationModel: ObservableObject {
-    enum Phase { case idle, requestingPermission, listening, translating, speaking }
+    enum Phase { case idle, requestingPermission, recording, finishing, saving }
     @Published var phase: Phase = .idle
     @Published var left = SpokenLanguage.all[0]
     @Published var right = SpokenLanguage.all[1]
     @Published var turns: [Turn] = []
-    @Published var partial = ""
+    @Published var partials: [RecognitionCandidate] = []
+    @Published var elapsed = 0.0
+    @Published var level = 0.0
+    @Published var inputDescription = ""
     @Published var message: String?
-    @Published var offlineJob: OfflineJob?
+    @Published var awaitingSaveChoice = false
+    @Published var speaking = false
     @Published var currentSourceIsLeft = true
-    @AppStorage("autoSpeak") var autoSpeak = true
-    @AppStorage("continuous") var continuous = false
+    @AppStorage("v2AutoSpeak") var autoSpeak = false
     @AppStorage("offlineASR") var offlineASR = false
-    @AppStorage("offlineTranslation") var offlineTranslation = false
-    @AppStorage("silenceSeconds") var silence = 0.8
+    @AppStorage("v2SilenceSeconds") var silence = 1.3
     @AppStorage("hints") var hints = ""
     private let speech = SpeechService()
-    private var work: Task<Void, Never>?
-    private var activeID: UUID?
+    private var authorization: Task<Void, Never>?
+    private var worker: Task<Void, Never>?
+    private var workerID = UUID()
+    private var finishDeadline: Task<Void, Never>?
+    private var speechQueue: [UUID] = []
+    private var queue: [UUID] = []
+    private var revision: [UUID: UUID] = [:]
+    private var sessionID = UUID()
+    private var sessionDate = Date()
+    private var audioURL: URL?
+    private var asrDrained = true
+    private var archiveHasAudioError = false
+    private var currentTranslation: UUID?
     private var began = Date()
+    init() { LocalArchive.cleanupAbandonedAudio() }
     var busy: Bool { phase != .idle }
+    var translatingCount: Int { turns.filter { $0.pending && !$0.needsConfirmation }.count }
+    var canSave: Bool { phase == .idle && audioURL != nil && !archiveHasAudioError && worker == nil }
+    var hasUnsavedSession: Bool { audioURL != nil }
     var status: String {
         switch phase {
-        case .idle: return "点击说话，停顿后自动翻译"
+        case .idle: return audioURL == nil ? "点击开始，双方自然轮流说话" : "对话已结束 · 可保存录音和文字到本机"
         case .requestingPermission: return "正在申请麦克风与语音识别权限"
-        case .listening: return "正在聆听 · 再点一次结束"
-        case .translating: return "正在翻译"
-        case .speaking: return "正在播报 · 点停止可中断"
+        case .recording: return speaking ? "正在播报 · 录音继续，识别暂缓" : "持续录音 · 自动识别双语 · 翻译队列 \(translatingCount)"
+        case .finishing: return "正在完成最后的识别与翻译"
+        case .saving: return "正在压缩录音并保存到本机"
         }
     }
-    func listen(fromLeft: Bool) {
-        stop()
-        message = nil; currentSourceIsLeft = fromLeft
-        let generation = UUID(); activeID = generation
-        phase = .requestingPermission
-        work = Task {
-            let permitted = await speech.authorize()
-            guard !Task.isCancelled, activeID == generation else { return }
-            guard permitted else { fail("请在 iPhone 设置中允许麦克风和语音识别权限"); return }
-            let source = fromLeft ? left : right
+    func startConversation() {
+        guard phase == .idle else { return }
+        guard audioURL == nil else { awaitingSaveChoice = true; return }
+        guard left != right else { message = "请选择两种不同的语言"; return }
+        workerID = UUID(); worker?.cancel(); worker = nil; queue.removeAll(); revision.removeAll()
+        message = nil; turns.removeAll(); partials = []; elapsed = 0; level = 0
+        sessionID = UUID(); sessionDate = Date(); let token = sessionID
+        archiveHasAudioError = false; phase = .requestingPermission
+        authorization = Task {
+            let allowed = await speech.authorize()
+            guard !Task.isCancelled, sessionID == token, phase == .requestingPermission else { return }
+            guard allowed else { phase = .idle; message = "请在 iPhone 设置中允许麦克风和语音识别"; return }
             do {
-                try speech.start(language: source, offline: offlineASR,
-                    hints: hints.split(separator: "\n").map(String.init), silence: silence,
-                    partial: { [weak self] text in self?.partial = text },
-                    final: { [weak self] text in self?.translate(text, fromLeft: fromLeft) },
-                    error: { [weak self] error in self?.fail(error) })
-                phase = .listening
-            } catch { fail(error.localizedDescription) }
-        }
-    }
-    func microphone(fromLeft: Bool) {
-        if phase == .listening && currentSourceIsLeft == fromLeft { speech.finish() }
-        else { listen(fromLeft: fromLeft) }
-    }
-    func translate(_ text: String, fromLeft: Bool) {
-        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        stop()
-        guard !cleaned.isEmpty else { return }
-        message = nil; partial = ""; currentSourceIsLeft = fromLeft
-        let source = fromLeft ? left : right; let target = fromLeft ? right : left
-        guard source != target else { fail("请选择两种不同的语言"); return }
-        let id = UUID(); activeID = id; began = Date()
-        turns.append(Turn(id: id, original: cleaned, source: source, target: target))
-        if turns.count > 100 { turns.removeFirst() }
-        phase = .translating
-        if offlineTranslation {
-            if #available(iOS 18.0, *) {
-                offlineJob = OfflineJob(id: id, text: cleaned, source: source, target: target, prepareOnly: false)
-            } else { fail("系统离线翻译需要 iOS 18 或以上；当前系统请使用 DeepSeek") }
-            return
-        }
-        let key = KeyStore.read()
-        work = Task {
-            do {
-                try await DeepSeekClient().translate(text: cleaned, source: source, target: target, key: key) { [weak self] delta in
-                    guard let self, self.activeID == id, let index = self.turns.firstIndex(where: { $0.id == id }) else { return }
-                    if self.turns[index].firstToken == nil { self.turns[index].firstToken = Date().timeIntervalSince(self.began) }
-                    self.turns[index].translation += delta
-                }
-                guard !Task.isCancelled, activeID == id else { return }
-                complete(id: id)
+                let url = try LocalArchive.temporaryAudio(); audioURL = url; asrDrained = false
+                try speech.start(left: left, right: right, offline: offlineASR,
+                    hints: hints.split(separator: "\n").map(String.init), silence: silence, audioURL: url,
+                    partial: { [weak self] in self?.partials = $0 },
+                    segment: { [weak self] decision, start, end in self?.receive(decision, start: start, end: end) },
+                    level: { [weak self] duration, level, input in
+                        self?.elapsed = duration; self?.level = level
+                        if let input { self?.inputDescription = input }
+                    }, warning: { [weak self] in self?.message = $0 })
+                phase = .recording
             } catch {
-                guard !Task.isCancelled, activeID == id else { return }
-                fail(error.localizedDescription)
+                speech.cancel(); if let url = audioURL { try? FileManager.default.removeItem(at: url) }
+                audioURL = nil; phase = .idle; message = error.localizedDescription
             }
         }
     }
-    func prepareOffline() {
-        stop(); message = nil
-        guard left != right else { fail("请选择两种不同的语言"); return }
-        if #available(iOS 18.0, *) {
-            let id = UUID(); activeID = id; phase = .translating
-            offlineJob = .init(id: id, text: "", source: left, target: right, prepareOnly: true)
-        } else { fail("离线翻译语言包需要 iOS 18 或以上") }
-    }
-    func offlineSucceeded(_ job: OfflineJob, translation: String?) {
-        guard activeID == job.id else { return }
-        offlineJob = nil
-        if job.prepareOnly { phase = .idle; activeID = nil; message = "此语言组合已准备好；请断网实测离线识别和播报"; return }
-        guard let translation, !translation.isEmpty, let index = turns.firstIndex(where: { $0.id == job.id }) else {
-            fail("系统未返回译文"); return
-        }
-        turns[index].translation = translation
-        complete(id: job.id)
-    }
-    func offlineFailed(_ job: OfflineJob, error: Error) {
-        guard activeID == job.id else { return }
-        fail("离线翻译失败：\(error.localizedDescription)。请检查语言组合是否支持、语言包是否下载")
-    }
-    private func complete(id: UUID) {
-        guard let turnIndex = turns.firstIndex(where: { $0.id == id }) else { return }
-        turns[turnIndex].elapsed = Date().timeIntervalSince(began)
-        let turn = turns[turnIndex]
-        if autoSpeak { speak(turn, resume: true) } else { phase = .idle; resumeIfNeeded() }
-    }
-    func replay(_ turn: Turn) { stop(); message = nil; speak(turn, resume: false) }
-    private func speak(_ turn: Turn, resume: Bool) {
-        guard !turn.translation.isEmpty && !turn.failed else { return }
-        phase = .speaking
-        do {
-            try speech.speak(turn.translation, language: turn.target) { [weak self] in
-                guard let self else { return }
-                self.phase = .idle
-                if resume { self.resumeIfNeeded() }
+    func endConversation() {
+        if phase == .requestingPermission { authorization?.cancel(); sessionID = UUID(); phase = .idle; return }
+        guard phase == .recording else { return }
+        phase = .finishing; speechQueue.removeAll(); speaking = false
+        let result = speech.finish { [weak self] in self?.asrDrained = true; self?.finishIfReady() }
+        elapsed = result.0; level = 0; partials = []
+        if let error = result.1 { archiveHasAudioError = true; message = error }
+        finishDeadline = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 60_000_000_000)
+            guard !Task.isCancelled, let self, self.phase == .finishing else { return }
+            self.workerID = UUID(); self.worker?.cancel(); self.worker = nil; self.queue.removeAll(); self.speech.cancel()
+            for index in self.turns.indices where self.turns[index].pending && !self.turns[index].needsConfirmation {
+                self.turns[index].pending = false; self.turns[index].failed = true
             }
-        } catch { fail(error.localizedDescription) }
+            self.asrDrained = true; self.message = "部分翻译尚未完成，录音仍可保存后核对"
+            self.finishIfReady()
+        }
+        finishIfReady()
     }
-    private func resumeIfNeeded() {
-        guard continuous else { return }
-        let direction = currentSourceIsLeft
-        work = Task {
-            // Leave a gap after playback so the microphone doesn't catch the speaker tail.
-            try? await Task.sleep(nanoseconds: 350_000_000)
-            guard !Task.isCancelled else { return }
-            listen(fromLeft: direction)
+    private func receive(_ decision: RecognitionDecision, start: Double, end: Double) {
+        guard let candidate = decision.candidate else { return }
+        let target = candidate.language == left ? right : left
+        let records = decision.alternatives.map { CandidateRecord(language: $0.language, text: $0.text, confidence: $0.confidence) }
+        var turn = Turn(id: UUID(), original: candidate.text, source: candidate.language, target: target)
+        turn.startedAt = start; turn.endedAt = end; turn.needsConfirmation = decision.needsConfirmation
+        turn.alternatives = records; turn.pending = !decision.needsConfirmation
+        if decision.needsConfirmation { turn.recognitionNote = "语言或原文可靠性不足，请核对后翻译" }
+        turns.append(turn)
+        turns.sort { $0.startedAt < $1.startedAt }
+        if !turn.needsConfirmation { enqueue(turn.id) }
+    }
+    func confirm(id: UUID, original: String, language: SpokenLanguage) {
+        guard let index = turns.firstIndex(where: { $0.id == id }), phase != .saving else { return }
+        let cleaned = original.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        turns[index].original = cleaned; turns[index].source = language
+        turns[index].target = language == left ? right : left
+        turns[index].needsConfirmation = false; turns[index].recognitionNote = nil
+        turns[index].translation = ""; turns[index].elapsed = nil; turns[index].firstToken = nil; turns[index].failed = false
+        enqueue(id)
+    }
+    func translateTyped(_ text: String) {
+        guard phase != .saving else { return }
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        let source = currentSourceIsLeft ? left : right
+        let target = currentSourceIsLeft ? right : left
+        guard source != target else { message = "请选择两种不同的语言"; return }
+        var turn = Turn(id: UUID(), original: cleaned, source: source, target: target)
+        turn.startedAt = elapsed; turn.endedAt = elapsed
+        turns.append(turn); enqueue(turn.id)
+    }
+    private func enqueue(_ id: UUID) {
+        guard let i = turns.firstIndex(where: { $0.id == id }) else { return }
+        turns[i].pending = true; revision[id] = UUID()
+        if !queue.contains(id) { queue.append(id) }
+        startWorker()
+    }
+    private func startWorker() {
+        guard worker == nil else { return }
+        let token = UUID(); workerID = token
+        worker = Task { [weak self] in
+            guard let self else { return }
+            while !self.queue.isEmpty && !Task.isCancelled && self.workerID == token {
+                let id = self.queue.removeFirst()
+                guard let index = self.turns.firstIndex(where: { $0.id == id }) else { continue }
+                let turn = self.turns[index]; let version = self.revision[id]
+                self.currentTranslation = id; self.began = Date()
+                let contextTurns = self.turns.prefix(index).filter { !$0.failed && !$0.pending && !$0.needsConfirmation }.suffix(4)
+                let context = contextTurns.map { "\($0.source.name): \($0.original)\n\($0.target.name): \($0.translation)" }.joined(separator: "\n").prefix(1600)
+                do {
+                    try await DeepSeekClient().translate(text: turn.original, source: turn.source, target: turn.target,
+                        key: KeyStore.read(), context: String(context)) { [weak self] delta in
+                        guard let self, self.revision[id] == version, let i = self.turns.firstIndex(where: { $0.id == id }) else { return }
+                        if self.turns[i].firstToken == nil { self.turns[i].firstToken = Date().timeIntervalSince(self.began) }
+                        self.turns[i].translation += delta
+                    }
+                    guard !Task.isCancelled else { break }
+                    if self.revision[id] == version, let i = self.turns.firstIndex(where: { $0.id == id }) {
+                        self.turns[i].elapsed = Date().timeIntervalSince(self.began); self.turns[i].pending = false
+                        if self.autoSpeak && self.phase == .recording { self.speechQueue.append(id); self.playNext() }
+                    }
+                } catch {
+                    guard !Task.isCancelled else { break }
+                    if self.revision[id] == version, let i = self.turns.firstIndex(where: { $0.id == id }) {
+                        self.turns[i].failed = true; self.turns[i].pending = false
+                        self.message = error.localizedDescription
+                    }
+                }
+            }
+            guard self.workerID == token else { return }
+            self.currentTranslation = nil; self.worker = nil; self.finishIfReady()
         }
     }
-    func stop() {
-        if phase == .translating, let id = activeID, let i = turns.firstIndex(where: { $0.id == id }) {
-            turns[i].failed = true
-        }
-        activeID = nil; work?.cancel(); work = nil
-        speech.stop(); speech.cancelSpeech(); offlineJob = nil
-        partial = ""; phase = .idle
+    private func playNext() {
+        guard !speaking, phase == .recording, autoSpeak, !speechQueue.isEmpty else { return }
+        let id = speechQueue.removeFirst()
+        guard let turn = turns.first(where: { $0.id == id }), !turn.failed, !turn.needsConfirmation else { playNext(); return }
+        speaking = true
+        do { try speech.speak(turn.translation, language: turn.target) { [weak self] in self?.speaking = false; self?.playNext() } }
+        catch { speaking = false; message = error.localizedDescription }
     }
-    private func fail(_ text: String) { stop(); message = text }
-    func clear() { stop(); turns.removeAll() }
+    func replay(_ turn: Turn) {
+        guard phase == .idle, !turn.translation.isEmpty, !turn.failed, !turn.needsConfirmation else { return }
+        speaking = true
+        do { try speech.speak(turn.translation, language: turn.target) { [weak self] in self?.speaking = false } }
+        catch { speaking = false; message = error.localizedDescription }
+    }
+    private func finishIfReady() {
+        guard phase == .finishing, asrDrained, worker == nil, queue.isEmpty else { return }
+        finishDeadline?.cancel(); finishDeadline = nil; phase = .idle; awaitingSaveChoice = true
+    }
+    func saveSession() {
+        guard canSave, worker == nil, let url = audioURL else { message = "请等翻译完成后再保存"; return }
+        phase = .saving; awaitingSaveChoice = false
+        let metadata = SavedConversation(id: sessionID, date: sessionDate, duration: elapsed,
+            left: left, right: right, turns: turns, audioFile: "audio.m4a")
+        Task {
+            do { try await LocalArchive.save(audio: url, conversation: metadata); audioURL = nil; message = "已保存到本机：录音与双语文字" }
+            catch { message = error.localizedDescription }
+            phase = .idle
+        }
+    }
+    func discardRecording() {
+        guard phase == .idle else { return }
+        if let url = audioURL { try? FileManager.default.removeItem(at: url) }
+        audioURL = nil; awaitingSaveChoice = false; message = "录音已删除；屏幕上的文字仍可查看"
+    }
+    func clear() {
+        guard phase == .idle else { return }
+        if audioURL != nil { awaitingSaveChoice = true; return }
+        workerID = UUID(); worker?.cancel(); worker = nil; queue.removeAll(); revision.removeAll()
+        speech.cancelSpeech(); speaking = false; turns.removeAll(); message = nil
+    }
 }

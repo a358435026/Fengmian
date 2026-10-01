@@ -8,7 +8,18 @@ private final class TranslationURLProtocol: URLProtocol {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        Self.capturedRequest = request
+        var captured = request
+        if captured.httpBody == nil, let stream = captured.httpBodyStream {
+            stream.open(); defer { stream.close() }
+            var body = Data(); var buffer = [UInt8](repeating: 0, count: 2048)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                body.append(contentsOf: buffer.prefix(count))
+            }
+            captured.httpBody = body
+        }
+        Self.capturedRequest = captured
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.status,
                                        httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "text/event-stream"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -38,7 +49,7 @@ final class DeepSeekClientTests: XCTestCase {
     private func event(_ value: String) -> String { "data: \(value)\r\n\r\n" }
     private func translate(onDelta: @escaping @MainActor (String) -> Void) async throws {
         try await DeepSeekClient(session: session).translate(text: "Where is the station?",
-                source: SpokenLanguage.all[1], target: SpokenLanguage.all[0], key: "test-only-key", onDelta: onDelta)
+                source: SpokenLanguage.all[1], target: SpokenLanguage.all[0], key: "test-only-key", context: "Earlier item: shipping quotation, smooth operation", onDelta: onDelta)
     }
     func testStreamedUnicodeAndOfficialEndpoint() async throws {
         TranslationURLProtocol.body = ": keepalive\r\n\r\n"
@@ -53,6 +64,12 @@ final class DeepSeekClientTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://api.deepseek.com/chat/completions")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer test-only-key")
         XCTAssertEqual(request.httpMethod, "POST")
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let messages = try XCTUnwrap(payload["messages"] as? [[String: String]])
+        XCTAssertTrue(messages[0]["content"]?.contains("negation") == true)
+        XCTAssertTrue(messages[0]["content"]?.contains("shipping quotation") == true)
+        XCTAssertEqual(messages.last?["content"], "Where is the station?")
     }
     func testIncompleteStreamIsRejected() async {
         TranslationURLProtocol.body = event("{\"choices\":[{\"delta\":{\"content\":\"车站\"},\"finish_reason\":null}]}")
