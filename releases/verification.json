@@ -1,0 +1,149 @@
+{
+  "file": "dist/ConversationTranslator-unsigned.ipa",
+  "bytes": 240920,
+  "sha256": "dcc159a943f914a50a1cc707c6c33bd8ac61d1928aadeff85eab3f066e0160b3",
+  "bundle_id": "local.conversation.translator",
+  "version": "0.1.0",
+  "build": "2",
+  "minimum_plist_ios": "15.0",
+  "architecture": "arm64",
+  "minimum_binary_ios": "15.0.0",
+  "libraries": [
+    {
+      "path": "/System/Library/Frameworks/Foundation.framework/Foundation",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/libobjc.A.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/libSystem.B.dylib",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/AVFAudio.framework/AVFAudio",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/Combine.framework/Combine",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/Security.framework/Security",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/Speech.framework/Speech",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/SwiftUI.framework/SwiftUI",
+      "weak": false
+    },
+    {
+      "path": "/System/Library/Frameworks/Translation.framework/Translation",
+      "weak": true
+    },
+    {
+      "path": "/System/Library/Frameworks/_Translation_SwiftUI.framework/_Translation_SwiftUI",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/libc++.1.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftAVFoundation.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCore.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreAudio.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreFoundation.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreImage.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreMIDI.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftCoreMedia.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftDarwin.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftDataDetection.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftDispatch.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftMetal.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftOSLog.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftObjectiveC.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftQuartzCore.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftSpatial.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftXPC.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswift_Concurrency.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftos.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftsimd.dylib",
+      "weak": true
+    },
+    {
+      "path": "/usr/lib/swift/libswiftFoundation.dylib",
+      "weak": false
+    },
+    {
+      "path": "/usr/lib/swift/libswiftUIKit.dylib",
+      "weak": true
+    }
+  ]
+}

@@ -6,3 +6,5 @@ dist/
 .env.*
 __pycache__/
 *.xcuserstate
+
+.remote-build.json

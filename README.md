@@ -2,7 +2,7 @@
 
 一个独立 SwiftUI 原生 App 项目，只做面对面对话翻译：说话 → 识别 → 翻译 → 播报。没有账户、广告、会议、照片、社交功能，不需要部署后端。
 
-**当前交付是原生源码和构建配置，不是已验证的安装包。此 Linux 工作区没有 Xcode，尚未编译或真机测试。没有配置 API 密钥，尚未实测 DeepSeek。**
+**已在 GitHub macOS runner 上通过 Xcode 16.4 编译，7 项模拟器自动测试通过，并生成用于 TrollStore 的 IPA。安装包与 arm64 可执行文件最低系统均为 iOS 15.0。尚未在实体 iOS 15 手机验证麦克风、声音和 Keychain，也未使用真实 DeepSeek 密钥测速。**
 
 ## 第一版已有实现
 
@@ -39,9 +39,9 @@ open ConversationTranslator.xcodeproj
 ./scripts/build-ipa.sh
 ```
 
-生成 `dist/ConversationTranslator-unsigned.ipa`，通过已经安装的 TrollStore 导入。本项目不安装 TrollStore、不要求越狱，也不使用特殊权限；仍需授予麦克风/语音识别权限。**兼容版本、Keychain 保存、Speech 权限、弱链接 Translation 框架都需要在实际巨魔设备验证。**
+生成 `dist/ConversationTranslator-unsigned.ipa`，通过已经安装的 TrollStore 导入。本项目不安装 TrollStore、不要求越狱，也不使用特殊权限；仍需授予麦克风/语音识别权限。**已核实 Translation 是弱链接、IPA 内文件权限保留。Keychain、Speech 权限和实际启动仍需在巨魔设备验证。**
 
-也提供 `.github/workflows/ios.yml`：将本目录作为仓库根目录推送到自己的 GitHub 仓库后，可手动运行 workflow，在 macOS runner 上编译、执行 SSE 单元测试、生成可下载的 unsigned IPA。当前没有创建远程仓库或执行此流程；私有仓库 runner 可能消耗计费额度。
+也提供 `.github/workflows/ios.yml`：将本目录作为仓库根目录推送到自己的 GitHub 仓库后，可手动运行 workflow，在 macOS runner 上编译、执行 SSE 单元测试、生成可下载的 unsigned IPA。本次已在用户授权的 `a358435026/Fengmian` 仓库独立 `translator-ios-build` 分支运行，主分支未修改。[构建结果](https://github.com/a358435026/Fengmian/actions/runs/36906252475)。独立仓库使用时可调整 workflow 的 branches；私有仓库 runner 可能消耗计费额度。
 
 ## 首次使用
 
