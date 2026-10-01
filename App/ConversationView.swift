@@ -25,10 +25,6 @@ struct ConversationView: View {
                 if let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
                    reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { model.endConversation() }
             }
-            .onChange(of: model.phase) { phase in
-                UIApplication.shared.isIdleTimerDisabled = phase == .recording || phase == .finishing || phase == .saving
-            }
-            .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
             .onChange(of: scenePhase) { phase in if phase == .background { model.endConversation() } }
     }
     private var content: some View {
@@ -118,16 +114,14 @@ struct ConversationView: View {
                 .font(.caption2).foregroundColor(.secondary).onTapGesture { model.currentSourceIsLeft.toggle() }
         }
     }
-    private var navigationTools: some ToolbarContent {
-        Group {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button { showLibrary = true } label: { Image(systemName: "folder") }.disabled(model.busy).accessibilityLabel("本地对话")
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack {
-                    Button { model.clear() } label: { Image(systemName: "trash") }.disabled(model.busy).accessibilityLabel("清空")
-                    Button { showSettings = true } label: { Image(systemName: "gearshape") }.disabled(model.busy).accessibilityLabel("设置")
-                }
+    @ToolbarContentBuilder private var navigationTools: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarLeading) {
+            Button { showLibrary = true } label: { Image(systemName: "folder") }.disabled(model.busy).accessibilityLabel("本地对话")
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            HStack {
+                Button { model.clear() } label: { Image(systemName: "trash") }.disabled(model.busy).accessibilityLabel("清空")
+                Button { showSettings = true } label: { Image(systemName: "gearshape") }.disabled(model.busy).accessibilityLabel("设置")
             }
         }
     }

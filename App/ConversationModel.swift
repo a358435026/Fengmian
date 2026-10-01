@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import UIKit
 
 @MainActor
 final class ConversationModel: ObservableObject {
@@ -72,6 +73,7 @@ final class ConversationModel: ObservableObject {
                         if let input { self?.inputDescription = input }
                     }, warning: { [weak self] in self?.message = $0 })
                 phase = .recording
+                UIApplication.shared.isIdleTimerDisabled = true
             } catch {
                 speech.cancel(); if let url = audioURL { try? FileManager.default.removeItem(at: url) }
                 audioURL = nil; phase = .idle; message = error.localizedDescription
@@ -81,6 +83,7 @@ final class ConversationModel: ObservableObject {
     func endConversation() {
         if phase == .requestingPermission { authorization?.cancel(); sessionID = UUID(); phase = .idle; return }
         guard phase == .recording else { return }
+        UIApplication.shared.isIdleTimerDisabled = false
         phase = .finishing; speechQueue.removeAll(); speaking = false
         let result = speech.finish { [weak self] in self?.asrDrained = true; self?.finishIfReady() }
         elapsed = result.0; level = 0; partials = []
@@ -193,12 +196,14 @@ final class ConversationModel: ObservableObject {
     func saveSession() {
         guard canSave, worker == nil, let url = audioURL else { message = "请等翻译完成后再保存"; return }
         phase = .saving; awaitingSaveChoice = false
+        UIApplication.shared.isIdleTimerDisabled = true
         let metadata = SavedConversation(id: sessionID, date: sessionDate, duration: elapsed,
             left: left, right: right, turns: turns, audioFile: "audio.m4a")
         Task {
             do { try await LocalArchive.save(audio: url, conversation: metadata); audioURL = nil; message = "已保存到本机：录音与双语文字" }
             catch { message = error.localizedDescription }
             phase = .idle
+            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
     func discardRecording() {
