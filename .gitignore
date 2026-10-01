@@ -8,3 +8,7 @@ __pycache__/
 *.xcuserstate
 
 .remote-build.json
+
+.build/
+.swiftpm/
+test.log

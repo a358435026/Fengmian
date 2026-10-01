@@ -17,11 +17,15 @@ enum LocalArchive {
         for file in (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? [] {
             try? FileManager.default.removeItem(at: file)
         }
+        for pending in (try? FileManager.default.contentsOfDirectory(at: Self.directory, includingPropertiesForKeys: nil)) ?? []
+            where pending.lastPathComponent.hasPrefix(".") && pending.pathExtension == "pending" {
+            try? FileManager.default.removeItem(at: pending)
+        }
     }
     static func list() -> [SavedConversation] {
         let folders = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
-        return folders.compactMap {
+        return folders.filter { !$0.lastPathComponent.hasPrefix(".") }.compactMap {
             guard let data = try? Data(contentsOf: $0.appendingPathComponent("transcript.json")) else { return nil }
             return try? decoder.decode(SavedConversation.self, from: data)
         }.sorted { $0.date > $1.date }
@@ -32,10 +36,16 @@ enum LocalArchive {
     }
     static func delete(_ conversation: SavedConversation) throws { try FileManager.default.removeItem(at: folder(conversation)) }
     static func save(audio: URL, conversation: SavedConversation) async throws {
-        let output = folder(conversation)
-        guard !FileManager.default.fileExists(atPath: output.path) else { throw TranslatorError.message("该对话已存在，未覆盖已有录音") }
+        let destination = folder(conversation)
+        let output = directory.appendingPathComponent("." + conversation.id.uuidString + ".pending", isDirectory: true)
+        guard !FileManager.default.fileExists(atPath: destination.path) else { throw TranslatorError.message("该对话已存在，未覆盖已有录音") }
+        if FileManager.default.fileExists(atPath: output.path) { try FileManager.default.removeItem(at: output) }
+        #if os(iOS)
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true,
                                                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
+        #else
+        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        #endif
         do {
             guard let export = AVAssetExportSession(asset: AVURLAsset(url: audio), presetName: AVAssetExportPresetAppleM4A) else {
                 throw TranslatorError.message("系统无法导出录音")
@@ -61,7 +71,8 @@ enum LocalArchive {
                 lines.append("")
             }
             try lines.joined(separator: "\n").write(to: output.appendingPathComponent("transcript.txt"), atomically: true, encoding: .utf8)
-            try FileManager.default.removeItem(at: audio)
+            try FileManager.default.moveItem(at: output, to: destination)
+            try? FileManager.default.removeItem(at: audio)
         } catch { try? FileManager.default.removeItem(at: output); throw error }
     }
 }

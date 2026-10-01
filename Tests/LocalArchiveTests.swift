@@ -20,6 +20,8 @@ final class LocalArchiveTests: XCTestCase {
         defer { try? LocalArchive.delete(record); try? FileManager.default.removeItem(at: temporary) }
         try await LocalArchive.save(audio: temporary, conversation: record)
         XCTAssertFalse(FileManager.default.fileExists(atPath: temporary.path))
+        let staging = LocalArchive.directory.appendingPathComponent("." + id.uuidString + ".pending")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
         for file in LocalArchive.files(record) { XCTAssertTrue(FileManager.default.fileExists(atPath: file.path)) }
         let restored = try XCTUnwrap(LocalArchive.list().first { $0.id == id })
         XCTAssertEqual(restored.turns[0].original, turn.original)
@@ -27,8 +29,8 @@ final class LocalArchiveTests: XCTestCase {
         let text = try String(contentsOf: LocalArchive.folder(record).appendingPathComponent("transcript.txt"), encoding: .utf8)
         XCTAssertTrue(text.contains("识别待确认"))
         XCTAssertTrue(text.contains("Do not ship before Friday"))
-        let audio = try AVAudioPlayer(contentsOf: LocalArchive.folder(record).appendingPathComponent("audio.m4a"))
-        XCTAssertGreaterThan(audio.duration, 0)
+        let audio = AVURLAsset(url: LocalArchive.folder(record).appendingPathComponent("audio.m4a"))
+        XCTAssertGreaterThan(audio.duration.seconds, 0)
     }
     func testSaveDoesNotOverwriteExistingRecording() async throws {
         let record = SavedConversation(id: UUID(), date: Date(), duration: 0, left: SpokenLanguage.all[0], right: SpokenLanguage.all[1], turns: [], audioFile: "audio.m4a")

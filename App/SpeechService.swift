@@ -203,7 +203,7 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
                         slot.completed = true
                         if slot.text.isEmpty { self.onWarning?("\(slot.language.name)识别中断；请检查网络或设备端语言支持") }
                     }
-                    if self.active?.id == batch.id { self.onPartial?(self.candidates(batch)) }
+                    if self.active?.id == batch.id { self.onPartial?(self.candidates(batch, evidence: false)) }
                     if batch.slots.allSatisfy(\.completed) {
                         if !batch.ending { self.endBatch(batch, restart: self.recording && !self.playbackMuted) }
                         self.deliver(batch)
@@ -254,10 +254,10 @@ final class SpeechService: NSObject, AVSpeechSynthesizerDelegate {
             } else { beginBatch() }
         }
     }
-    private func candidates(_ batch: Batch) -> [RecognitionCandidate] {
+    private func candidates(_ batch: Batch, evidence: Bool = true) -> [RecognitionCandidate] {
         batch.slots.filter { !$0.text.isEmpty }.map {
             .init(language: $0.language, text: $0.text, confidence: $0.confidence,
-                  languageEvidence: RecognitionPolicy.evidence(text: $0.text, language: $0.language), isFinal: $0.final)
+                  languageEvidence: evidence ? RecognitionPolicy.evidence(text: $0.text, language: $0.language) : 0, isFinal: $0.final)
         }
     }
     private func deliver(_ batch: Batch) {

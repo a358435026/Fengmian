@@ -35,7 +35,7 @@ final class ConversationModel: ObservableObject {
     private var archiveHasAudioError = false
     private var currentTranslation: UUID?
     private var began = Date()
-    init() { LocalArchive.cleanupAbandonedAudio() }
+    init() {}
     var busy: Bool { phase != .idle }
     var translatingCount: Int { turns.filter { $0.pending && !$0.needsConfirmation }.count }
     var canSave: Bool { phase == .idle && audioURL != nil && !archiveHasAudioError && worker == nil }
