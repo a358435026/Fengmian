@@ -17,7 +17,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
       - name: Test shared recognition, translation and local archive code
-        run: swift test 2>&1 | tee test.log
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test.log
       - name: Install project generator
         run: brew install xcodegen
       - name: Build iOS 15 device IPA

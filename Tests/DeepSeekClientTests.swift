@@ -98,4 +98,43 @@ final class DeepSeekClientTests: XCTestCase {
         } catch { XCTAssertTrue(error.localizedDescription.contains("密钥")) }
         XCTAssertNil(TranslationURLProtocol.capturedRequest)
     }
+    func testRelayEndpointAndCustomModel() async throws {
+        TranslationURLProtocol.body = event("{\"choices\":[{\"delta\":{\"content\":\"Hello\"},\"finish_reason\":\"stop\"}]}") + event("[DONE]")
+        let config = APIConfiguration(provider: .custom, baseURL: "https://relay.example/v1/chat/completions", model: "custom-model", format: .openai)
+        try await DeepSeekClient(session: session).translate(text: "你好", source: SpokenLanguage.all[0], target: SpokenLanguage.all[1], key: "test", configuration: config) { _ in }
+        let request = try XCTUnwrap(TranslationURLProtocol.capturedRequest)
+        XCTAssertEqual(request.url?.absoluteString, config.baseURL)
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        XCTAssertEqual(payload["model"] as? String, "custom-model")
+    }
+    func testAnthropicNativeResponseAndHeaders() async throws {
+        TranslationURLProtocol.body = "{\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}],\"stop_reason\":\"end_turn\"}"
+        var output = ""
+        try await DeepSeekClient(session: session).translate(text: "你好", source: SpokenLanguage.all[0], target: SpokenLanguage.all[1], key: "test", configuration: .preset(.anthropic)) { output += $0 }
+        XCTAssertEqual(output, "Hello")
+        let request = try XCTUnwrap(TranslationURLProtocol.capturedRequest)
+        XCTAssertEqual(request.url?.path, "/v1/messages")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-api-key"), "test")
+        XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+    }
+    func testGeminiNativeResponseAndHeaders() async throws {
+        TranslationURLProtocol.body = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"private thinking\",\"thought\":true},{\"text\":\"Hello\"}]},\"finishReason\":\"STOP\"}]}"
+        var output = ""
+        try await DeepSeekClient(session: session).translate(text: "你好", source: SpokenLanguage.all[0], target: SpokenLanguage.all[1], key: "test", configuration: .preset(.gemini)) { output += $0 }
+        XCTAssertEqual(output, "Hello")
+        let request = try XCTUnwrap(TranslationURLProtocol.capturedRequest)
+        XCTAssertTrue(request.url!.path.hasSuffix(":generateContent"))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-goog-api-key"), "test")
+        XCTAssertNil(request.url?.query)
+    }
+    func testUnsafeAddressRejectedBeforeSendingCredential() async {
+        let config = APIConfiguration(provider: .custom, baseURL: "http://relay.example/v1", model: "m", format: .openai)
+        do {
+            try await DeepSeekClient(session: session).translate(text: "你好", source: SpokenLanguage.all[0], target: SpokenLanguage.all[1], key: "test", configuration: config) { _ in }
+            XCTFail("Unsafe address must fail")
+        } catch { XCTAssertTrue(error.localizedDescription.contains("HTTPS")) }
+        XCTAssertNil(TranslationURLProtocol.capturedRequest)
+    }
+
 }

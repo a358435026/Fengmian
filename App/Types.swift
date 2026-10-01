@@ -83,3 +83,90 @@ struct SSEParser {
         return nil
     }
 }
+
+// Non-secret configuration. Credentials stay in Keychain, separated by service.
+enum APIProvider: String, CaseIterable, Codable, Identifiable {
+    case deepseek, openai, anthropic, gemini, qwen, moonshot, glm, custom
+    var id: String { rawValue }
+    var name: String {
+        switch self {
+        case .deepseek: return "DeepSeek 官方"
+        case .openai: return "OpenAI 官方"
+        case .anthropic: return "Anthropic Claude 官方"
+        case .gemini: return "Google Gemini 官方"
+        case .qwen: return "阿里通义千问"
+        case .moonshot: return "Moonshot / Kimi"
+        case .glm: return "智谱 GLM"
+        case .custom: return "自定义 / 第三方中转"
+        }
+    }
+    var endpoint: String {
+        switch self {
+        case .deepseek: return "https://api.deepseek.com"
+        case .openai: return "https://api.openai.com/v1"
+        case .anthropic: return "https://api.anthropic.com/v1"
+        case .gemini: return "https://generativelanguage.googleapis.com/v1beta"
+        case .qwen: return "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        case .moonshot: return "https://api.moonshot.cn/v1"
+        case .glm: return "https://open.bigmodel.cn/api/paas/v4"
+        case .custom: return ""
+        }
+    }
+    var model: String {
+        switch self {
+        case .deepseek: return "deepseek-chat"
+        case .openai: return "gpt-4.1-mini"
+        case .anthropic: return "claude-sonnet-4-20250514"
+        case .gemini: return "gemini-2.5-flash"
+        case .qwen: return "qwen-turbo"
+        case .moonshot: return "moonshot-v1-8k"
+        case .glm: return "glm-4-flash"
+        case .custom: return ""
+        }
+    }
+}
+enum APIWireFormat: String, CaseIterable, Codable, Identifiable {
+    case openai, anthropic, gemini
+    var id: String { rawValue }
+    var name: String { switch self { case .openai: return "OpenAI 兼容"; case .anthropic: return "Anthropic Messages"; case .gemini: return "Gemini 原生" } }
+}
+struct APIConfiguration: Codable, Equatable {
+    var provider: APIProvider = .deepseek
+    var baseURL = APIProvider.deepseek.endpoint
+    var model = APIProvider.deepseek.model
+    var format: APIWireFormat = .openai
+    static func preset(_ provider: APIProvider) -> Self {
+        .init(provider: provider, baseURL: provider.endpoint, model: provider.model,
+              format: provider == .anthropic ? .anthropic : provider == .gemini ? .gemini : .openai)
+    }
+    static func load() -> Self {
+        guard let data = UserDefaults.standard.data(forKey: "translationAPIConfiguration"),
+              let value = try? JSONDecoder().decode(Self.self, from: data) else { return .init() }
+        return value
+    }
+    func save() throws {
+        _ = try requestURL()
+        UserDefaults.standard.set(try JSONEncoder().encode(self), forKey: "translationAPIConfiguration")
+    }
+    func requestURL() throws -> URL {
+        let clean = baseURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard let base = URLComponents(string: clean), base.scheme == "https", base.host != nil,
+              base.user == nil, base.password == nil, base.query == nil, base.fragment == nil else {
+            throw TranslatorError.message("API 地址需为 HTTPS，不能包含密钥、查询参数或用户名")
+        }
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !model.isEmpty else { throw TranslatorError.message("请填写模型名称") }
+        let endpoint: String
+        switch format {
+        case .openai: endpoint = clean.hasSuffix("/chat/completions") ? clean : clean + "/chat/completions"
+        case .anthropic: endpoint = clean.hasSuffix("/messages") ? clean : clean + "/messages"
+        case .gemini:
+            guard !model.contains("/"), !model.contains(":"), !model.contains("?"), !model.contains("#") else {
+                throw TranslatorError.message("Gemini 模型名称只填模型 ID，不填 URL")
+            }
+            endpoint = clean + "/models/" + model + ":generateContent"
+        }
+        guard let url = URL(string: endpoint) else { throw TranslatorError.message("API 地址无效") }
+        return url
+    }
+}

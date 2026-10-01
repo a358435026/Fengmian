@@ -38,7 +38,7 @@ final class ConversationModel: ObservableObject {
     private var began = Date()
     init() {}
     var busy: Bool { phase != .idle }
-    var translatingCount: Int { turns.filter { $0.pending && !$0.needsConfirmation }.count }
+    var translatingCount: Int { turns.filter { $0.pending }.count }
     var canSave: Bool { phase == .idle && audioURL != nil && !archiveHasAudioError && worker == nil }
     var hasUnsavedSession: Bool { audioURL != nil }
     var status: String {
@@ -92,7 +92,7 @@ final class ConversationModel: ObservableObject {
             try? await Task.sleep(nanoseconds: 60_000_000_000)
             guard !Task.isCancelled, let self, self.phase == .finishing else { return }
             self.workerID = UUID(); self.worker?.cancel(); self.worker = nil; self.queue.removeAll(); self.speech.cancel()
-            for index in self.turns.indices where self.turns[index].pending && !self.turns[index].needsConfirmation {
+            for index in self.turns.indices where self.turns[index].pending {
                 self.turns[index].pending = false; self.turns[index].failed = true
             }
             self.asrDrained = true; self.message = "部分翻译尚未完成，录音仍可保存后核对"
@@ -106,11 +106,11 @@ final class ConversationModel: ObservableObject {
         let records = decision.alternatives.map { CandidateRecord(language: $0.language, text: $0.text, confidence: $0.confidence) }
         var turn = Turn(id: UUID(), original: candidate.text, source: candidate.language, target: target)
         turn.startedAt = start; turn.endedAt = end; turn.needsConfirmation = decision.needsConfirmation
-        turn.alternatives = records; turn.pending = !decision.needsConfirmation
-        if decision.needsConfirmation { turn.recognitionNote = "语言或原文可靠性不足，请核对后翻译" }
+        turn.alternatives = records; turn.pending = true
+        if decision.needsConfirmation { turn.recognitionNote = "原文或语言可能不准：以下为试译，请核对，暂不自动播报" }
         turns.append(turn)
         turns.sort { $0.startedAt < $1.startedAt }
-        if !turn.needsConfirmation { enqueue(turn.id) }
+        enqueue(turn.id)
     }
     func confirm(id: UUID, original: String, language: SpokenLanguage) {
         guard let index = turns.firstIndex(where: { $0.id == id }), phase != .saving else { return }
@@ -153,7 +153,7 @@ final class ConversationModel: ObservableObject {
                 let context = contextTurns.map { "\($0.source.name): \($0.original)\n\($0.target.name): \($0.translation)" }.joined(separator: "\n").prefix(1600)
                 do {
                     try await DeepSeekClient().translate(text: turn.original, source: turn.source, target: turn.target,
-                        key: KeyStore.read(), context: String(context)) { [weak self] delta in
+                        key: KeyStore.read(provider: APIConfiguration.load().provider), context: String(context), configuration: APIConfiguration.load()) { [weak self] delta in
                         guard let self, self.revision[id] == version, let i = self.turns.firstIndex(where: { $0.id == id }) else { return }
                         if self.turns[i].firstToken == nil { self.turns[i].firstToken = Date().timeIntervalSince(self.began) }
                         self.turns[i].translation += delta
@@ -161,7 +161,7 @@ final class ConversationModel: ObservableObject {
                     guard !Task.isCancelled else { break }
                     if self.revision[id] == version, let i = self.turns.firstIndex(where: { $0.id == id }) {
                         self.turns[i].elapsed = Date().timeIntervalSince(self.began); self.turns[i].pending = false
-                        if self.autoSpeak && self.phase == .recording { self.speechQueue.append(id); self.playNext() }
+                        if self.autoSpeak && !self.turns[i].needsConfirmation && self.phase == .recording { self.speechQueue.append(id); self.playNext() }
                     }
                 } catch {
                     guard !Task.isCancelled else { break }
