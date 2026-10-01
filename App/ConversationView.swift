@@ -125,6 +125,10 @@ struct ConversationView: View {
                 if let reason = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
                    reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { model.endConversation() }
             }
+            .onChange(of: model.phase) { phase in
+                UIApplication.shared.isIdleTimerDisabled = phase == .recording || phase == .finishing || phase == .saving
+            }
+            .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
             .onChange(of: scenePhase) { phase in if phase == .background { model.endConversation() } }
     }
     private func languagePicker(_ selection: Binding<SpokenLanguage>) -> some View {

@@ -3,7 +3,7 @@ import AVFoundation
 
 @MainActor
 final class ConversationModel: ObservableObject {
-    enum Phase { case idle, requestingPermission, recording, finishing, saving }
+    enum Phase: Equatable { case idle, requestingPermission, recording, finishing, saving }
     @Published var phase: Phase = .idle
     @Published var left = SpokenLanguage.all[0]
     @Published var right = SpokenLanguage.all[1]
