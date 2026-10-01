@@ -35,22 +35,31 @@ struct VoiceRibbon: View {
     let level: Double
     var body: some View {
         HStack(alignment: .center, spacing: 4) {
-            ForEach(0..<35) { index in
-                Capsule()
-                    .fill(TranslatorDesign.blue.opacity(opacity(index)))
-                    .frame(width: 3, height: height(index))
+            ForEach(0..<35, id: \.self) { index in
+                ribbonBar(index)
             }
         }.frame(maxWidth: .infinity).frame(height: 32)
             .animation(.easeOut(duration: 0.15), value: level)
             .accessibilityHidden(true)
     }
-    private func height(_ index: Int) -> CGFloat {
-        let envelope = sin(Double(index + 1) / 36 * .pi)
-        let variation = 0.35 + abs(sin(Double(index) * 1.7)) * 0.65
-        return CGFloat(4 + envelope * variation * (6 + min(max(level, 0), 1) * 22))
+    private func ribbonBar(_ index: Int) -> some View {
+        let color: Color = TranslatorDesign.blue.opacity(barOpacity(index))
+        let height: CGFloat = barHeight(index)
+        return Capsule().fill(color).frame(width: 3, height: height)
     }
-    private func opacity(_ index: Int) -> Double {
-        0.18 + sin(Double(index + 1) / 36 * .pi) * 0.72
+    private func barHeight(_ index: Int) -> CGFloat {
+        let position: Double = Double(index + 1) / 36.0
+        let envelope: Double = sin(position * Double.pi)
+        let variation: Double = 0.35 + abs(sin(Double(index) * 1.7)) * 0.65
+        let boundedLevel: Double = min(max(level, 0.0), 1.0)
+        let amplitude: Double = 6.0 + boundedLevel * 22.0
+        let height: Double = 4.0 + envelope * variation * amplitude
+        return CGFloat(height)
+    }
+    private func barOpacity(_ index: Int) -> Double {
+        let position: Double = Double(index + 1) / 36.0
+        let envelope: Double = sin(position * Double.pi)
+        return 0.18 + envelope * 0.72
     }
 }
 
